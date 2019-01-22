@@ -3,6 +3,7 @@ import tkFileDialog
 import cv2
 import os
 from numpy import *
+import sys
  
 def select_image():
     # grab a reference to the image panels
@@ -17,6 +18,8 @@ class Window(Frame):
 
 
     def __init__(self, master=None):
+        print sys.version
+        print cv2.__version__
         Frame.__init__(self, master)                 
         self.master = master
         
@@ -30,12 +33,19 @@ class Window(Frame):
         self.boxW = []
         self.boxH = []
         self.fishCount = 1
+        self.shot=[]
 
         self.path = ''
         self.directory = ''
+        self.posdir = ''
+        self.negdir = ''
+        self.framedir = ''
+        self.vidfilename = ''
+        self.vidfileext = ''
         self.numFishstr = "1"
         self.numFish = int(self.numFishstr)
         self.framenum=0
+        self.trialnum=0
 
         self.font                   = cv2.FONT_HERSHEY_SIMPLEX
         self.blc = (10,50)
@@ -47,10 +57,12 @@ class Window(Frame):
         self.fps = 30
         self.frameskips = '1'
         self.frameskip = 1
+        self.classlabel = 'archerfish'
 
     #Creation of init_window
     def init_window(self):
 
+        
         # changing the title of our master widget      
         self.master.title("GUI")
 
@@ -88,6 +100,27 @@ class Window(Frame):
 
     def pickfile(self):
         self.path = tkFileDialog.askopenfilename()
+        self.vidfilename = os.path.split(self.path)[1]
+        self.vidfilename = self.vidfilename[0:-4]
+        self.vidfileext = self.vidfilename[-4:]
+        print self.vidfilename
+        self.directory = self.path[0:-4]+'/'
+        self.posdir = self.directory+'pos/'
+        self.negdir = self.directory+'neg/'
+        self.framedir = self.directory+'frame/'
+        print self.directory
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+        if not os.path.exists(self.posdir):
+            os.makedirs(self.posdir)
+        if not os.path.exists(self.negdir):
+            os.makedirs(self.negdir)
+        if not os.path.exists(self.framedir):
+            os.makedirs(self.framedir)
+        self.trackfile = open(self.directory+self.vidfilename+'_track.txt','wb')
+        self.annotfile = open(self.framedir+self.vidfilename+'_annotations.csv','wb')
+        self.annotfile.write('Filename,   Annotation tag,  Upper left corner X, Upper left corner Y, Lower right corner X,   Lower right corner Y,    Occluded,    Origin file, Origin frame number\r\n')
+        
 
 
     def update_location(self,event,x,y,flags,param):
@@ -121,7 +154,8 @@ class Window(Frame):
         #load the capture
         cap = cv2.VideoCapture(self.path)
         #how long is the video
-        vidlength = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        #vidlength = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        vidlength = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         #how many fish? from GUI
         self.numFish = int(self.inputnumfish.get())
         #initialize arrays 
@@ -134,8 +168,10 @@ class Window(Frame):
             self.boxH.append(None)
             self.boxW.append(None)
             self.occluded.append(False)
+            self.shot.append(False)
         self.frameskip = int(self.inputskip.get())
-        self.fps    = cap.get(cv2.cv.CV_CAP_PROP_FPS)
+        # self.fps    = cap.get(cv2.cv.CV_CAP_PROP_FPS)
+        self.fps    = cap.get(cv2.CAP_PROP_FPS)
         while(not done):
             self.fishCount = 1
             ret, frame = cap.read()
@@ -153,6 +189,8 @@ class Window(Frame):
             #reset all "occluded" vars to false
             for ind in range(0,self.numFish):
                 self.occluded[ind]=False
+                self.shot[ind] = False
+
 
             if (self.framenum%self.frameskip) ==0:
                 #wait for a key press
@@ -165,6 +203,10 @@ class Window(Frame):
                             self.dragmode = not self.dragmode
                         if key==ord('o'):
                             self.occluded[self.fishCount-1]= not self.occluded[self.fishCount-1]
+                        if key==ord('t'):
+                            self.trialnum+=1
+                        if key==ord('s'):
+                            self.shot[self.fishCount-1]= not self.shot[self.fishCount]
 
                         frame = frame_orig.copy()
                         cv2.putText(frame,'select Fish '+str(self.fishCount)+', press space to advance', self.blc, self.font, self.fontScale,self.fontColor,self.lineType)
@@ -178,6 +220,9 @@ class Window(Frame):
                             cv2.putText(frame,'drag mode (m to change)',(10,100),self.font,self.fontScale,self.fontColor,self.lineType)
                         else:
                             cv2.putText(frame,'click mode (m to change)',(10,100),self.font,self.fontScale,self.fontColor,self.lineType)
+
+                        cv2.putText(frame,'trial: '+str(self.trialnum)+' (t to increment)',(10,150),self.font,self.fontScale,self.fontColor,self.lineType)
+                        cv2.putText(frame,'this fish shot now: '+str(self.shot[self.fishCount-1])+'(s to toggle)',(10,175),self.font,self.fontScale,self.fontColor,self.lineType)
                         #print self.boxUL
                         for ind in range(0,self.numFish):
                             if ((self.boxUL[ind][0]!=None) and (self.boxLR[ind][0]!=None)):
@@ -186,16 +231,58 @@ class Window(Frame):
                         key = cv2.waitKey(10)
                     self.fishCount+=1
 
+                print('writing for frame '+str(self.framenum))
+                #now all fish have been tracked. Time to store things
+                #first write to the track file
+                timenow = 1.0*self.framenum/self.fps
+                self.trackfile.write(str(timenow)+'\t')
+                self.trackfile.write(str(self.framenum)+'\t')
+                #write trial number to file
+                self.trackfile.write(str(self.trialnum)+'\t')
+                #now loop through all fish and write x,y,x,y,etc
+                for ind in range(0,self.numFish):
+                    self.trackfile.write(str(self.centers[ind][0])+'\t'+str(self.centers[ind][1])+'\t')
+                    self.trackfile.write(str(self.shot[ind])+'\t')
+                self.trackfile.write('\r\n')
+
+                #now save the full original frame write the annotations file for the frame
+                framefilename = self.vidfilename+'_'+str(self.framenum)+'.jpg'
+                cv2.imwrite(self.framedir+framefilename, frame_orig)
+                #format for annotation file:
+                #Filename   Annotation tag  Upper left corner X Upper left corner Y Lower right corner X    Lower right corner Y    Occluded    Origin file Origin frame number
+                #there should be numFish annotations per frame!! ALWAYS!!
+                for ind in range(0,self.numFish):
+                    self.annotfile.write(framefilename+',')
+                    self.annotfile.write(self.classlabel+',')
+                    self.annotfile.write(str(self.boxUL[ind][0])+',')
+                    self.annotfile.write(str(self.boxUL[ind][0])+',')
+                    self.annotfile.write(str(self.boxLR[ind][0])+',')
+                    self.annotfile.write(str(self.boxLR[ind][0])+',')
+                    self.annotfile.write(str(int(self.occluded[ind]))+',')
+                    self.annotfile.write(self.vidfilename+self.vidfileext+',')
+                    self.annotfile.write(str(self.framenum)+'\r\n')
+
+                #finally, save the basic pos/neg images for each fish.
+                for ind in range(0,self.numFish):
+                    poscrop = frame_orig[self.centers[ind][1]-self.boxH[ind]/2:self.centers[ind][1]+self.boxH[ind]/2,self.centers[ind][0]-self.boxW[ind]/2:self.centers[ind][0]+self.boxH[ind]/2,:]
+                    posfilename = self.posdir+self.vidfilename+'_'+str(self.framenum)+'_'+str(ind)+'.jpg'
+                    cv2.imwrite(posfilename,poscrop)
+                #now that all positive crops have been saved, let's automatically generate the same number of negatives
+
+
+
+                #now check to see if capture is open
                 if not cap.isOpened():
                     done = True
                     print("closing")
 
-
-                if key & 0xFF == ord('q'):
+                #handle quit key
+                if key == ord('q'):
                     done = True
                     print("closing")
             
-
+        self.annotfile.close()
+        self.trackfile.close()
         cap.release()
         cv2.destroyWindow('frame')
         cv2.waitKey(1)
