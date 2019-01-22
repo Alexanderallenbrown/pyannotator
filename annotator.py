@@ -122,6 +122,25 @@ class Window(Frame):
         self.annotfile.write('Filename,   Annotation tag,  Upper left corner X, Upper left corner Y, Lower right corner X,   Lower right corner Y,    Occluded,    Origin file, Origin frame number\r\n')
         
 
+    def checkbb(self,ulx,uly,lrx,lry):
+        #check if any of the corner points of this bounding box are inside any of the bounding boxes we have
+        #if this is a good box, return True.
+        #pull out all xy points for this query box
+        points = [[ulx,uly],[lrx,uly],[ulx,lry],[lrx,lry]]
+        check = True #start with the assumption that this box is AOK.
+        for ind in range(0,self.numFish):
+            for corn in range(0,4):
+                cornx,corny = points[corn][0],points[corn][1]
+                if ((cornx>self.boxUL[ind][0])and(cornx<self.boxLR[ind][0])):
+                    if ((corny>self.boxUL[ind][1])and(corny<self.boxLR[ind][1])):
+                        check = False
+                        print "found ya"
+        return check
+
+
+
+
+
 
     def update_location(self,event,x,y,flags,param):
         if event==cv2.EVENT_LBUTTONDOWN:
@@ -175,6 +194,7 @@ class Window(Frame):
         while(not done):
             self.fishCount = 1
             ret, frame = cap.read()
+            height,width,depth = frame.shape
             if frame is not None:
                 self.framenum+=1
                 frame_orig = frame.copy()
@@ -268,8 +288,56 @@ class Window(Frame):
                     posfilename = self.posdir+self.vidfilename+'_'+str(self.framenum)+'_'+str(ind)+'.jpg'
                     cv2.imwrite(posfilename,poscrop)
                 #now that all positive crops have been saved, let's automatically generate the same number of negatives
+                #this should save 4 negatives for each fish, but won't save all if there is a problem
+                negfilename = self.negdir+self.vidfilename+'_'+str(self.framenum)
+                for ind in range(0,self.numFish):
+                    #try a negative to the right of this fish
+                    ulx,uly = self.centers[ind][0]+self.boxW[ind]/2,self.centers[ind][1]-self.boxH[ind]/2
+                    lrx,lry = self.centers[ind][0]+3*self.boxW[ind]/2,self.centers[ind][1]+self.boxH[ind]/2
+                    #now make sure this is in bounds
+                    if ((ulx>0)and(lrx)<width):
+                        if ((uly>0)and(lry<height)):
+                            #now check to see if this overlaps with a fish
+                            if(self.checkbb(ulx,uly,lrx,lry)):
+                                neg = frame_orig[uly:lry,ulx:lrx,:]
+                                cv2.imwrite(negfilename+'_'+str(ind)+'_r.jpg',neg)
+                                #print('wrote right neg')
 
+                    #try a negative to the left of this fish
+                    ulx,uly = self.centers[ind][0]-3*self.boxW[ind]/2,self.centers[ind][1]-self.boxH[ind]/2
+                    lrx,lry = self.centers[ind][0]-self.boxW[ind]/2,self.centers[ind][1]+self.boxH[ind]/2
+                    
+                    if ((ulx>0)and(lrx)<width):
+                        if ((uly>0)and(lry<height)):
+                            #now check to see if this overlaps with a fish
+                            if(self.checkbb(ulx,uly,lrx,lry)):
+                                neg = frame_orig[uly:lry,ulx:lrx,:]
+                                cv2.imwrite(negfilename+'_'+str(ind)+'_l.jpg',neg)
+                                #print('wrote left neg')
 
+                    #try a negative above this fish
+                    ulx,uly = self.centers[ind][0]-self.boxW[ind]/2,self.centers[ind][1]-3*self.boxH[ind]/2
+                    lrx,lry = self.centers[ind][0]+self.boxW[ind]/2,self.centers[ind][1]-self.boxH[ind]/2
+
+                    if ((ulx>0)and(lrx)<width):
+                        if ((uly>0)and(lry<height)):
+                            #now check to see if this overlaps with a fish
+                            if(self.checkbb(ulx,uly,lrx,lry)):
+                                neg = frame_orig[uly:lry,ulx:lrx,:]
+                                cv2.imwrite(negfilename+'_'+str(ind)+'_u.jpg',neg)
+                                #print('wrote up neg')
+
+                    #try a negative below this fish
+                    ulx,uly = self.centers[ind][0]-self.boxW[ind]/2,self.centers[ind][1]+self.boxH[ind]/2
+                    lrx,lry = self.centers[ind][0]+self.boxW[ind]/2,self.centers[ind][1]+3*self.boxH[ind]/2
+                    
+                    if ((ulx>0)and(lrx)<width):
+                        if ((uly>0)and(lry<height)):
+                            #now check to see if this overlaps with a fish
+                            if(self.checkbb(ulx,uly,lrx,lry)):
+                                neg = frame_orig[uly:lry,ulx:lrx,:]
+                                cv2.imwrite(negfilename+'_'+str(ind)+'_d.jpg',neg)
+                                #print('wrote down neg')
 
                 #now check to see if capture is open
                 if not cap.isOpened():
