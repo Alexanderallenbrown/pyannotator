@@ -101,8 +101,9 @@ class Window(Frame):
     def pickfile(self):
         self.path = tkFileDialog.askopenfilename()
         self.vidfilename = os.path.split(self.path)[1]
-        self.vidfilename = self.vidfilename[0:-4]
         self.vidfileext = self.vidfilename[-4:]
+        self.vidfilename = self.vidfilename[0:-4]
+        
         print self.vidfilename
         self.directory = self.path[0:-4]+'/'
         self.posdir = self.directory+'pos/'
@@ -275,9 +276,9 @@ class Window(Frame):
                     self.annotfile.write(framefilename+',')
                     self.annotfile.write(self.classlabel+',')
                     self.annotfile.write(str(self.boxUL[ind][0])+',')
-                    self.annotfile.write(str(self.boxUL[ind][0])+',')
+                    self.annotfile.write(str(self.boxUL[ind][1])+',')
                     self.annotfile.write(str(self.boxLR[ind][0])+',')
-                    self.annotfile.write(str(self.boxLR[ind][0])+',')
+                    self.annotfile.write(str(self.boxLR[ind][1])+',')
                     self.annotfile.write(str(int(self.occluded[ind]))+',')
                     self.annotfile.write(self.vidfilename+self.vidfileext+',')
                     self.annotfile.write(str(self.framenum)+'\r\n')
