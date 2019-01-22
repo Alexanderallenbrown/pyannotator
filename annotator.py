@@ -206,7 +206,7 @@ class Window(Frame):
                         if key==ord('t'):
                             self.trialnum+=1
                         if key==ord('s'):
-                            self.shot[self.fishCount-1]= not self.shot[self.fishCount]
+                            self.shot[self.fishCount-1]= not self.shot[self.fishCount-1]
 
                         frame = frame_orig.copy()
                         cv2.putText(frame,'select Fish '+str(self.fishCount)+', press space to advance', self.blc, self.font, self.fontScale,self.fontColor,self.lineType)
