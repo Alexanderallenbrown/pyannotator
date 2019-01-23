@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from Tkinter import *
 import tkFileDialog
 import cv2
