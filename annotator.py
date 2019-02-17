@@ -121,7 +121,7 @@ class Window(Frame):
             os.makedirs(self.framedir)
         self.trackfile = open(self.directory+self.vidfilename+'_track.txt','wb')
         self.annotfile = open(self.framedir+self.vidfilename+'_annotations.csv','wb')
-        self.annotfile.write('Filename,   Annotation tag,  Upper left corner X, Upper left corner Y, Lower right corner X,   Lower right corner Y,    Occluded,    Origin file, Origin frame number\r\n')
+        self.annotfile.write('Filename,   Annotation tag,  Upper left corner Y, Upper left corner X, Lower right corner Y,   Lower right corner X,    Occluded,    Origin file, Origin frame number\r\n')
         
 
     def checkbb(self,ulx,uly,lrx,lry):
